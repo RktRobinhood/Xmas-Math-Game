@@ -5,7 +5,6 @@
 
 import { PlayerState, QuizState, GamePhase, Problem, PlayerAvatarId, ShopItem } from '../types';
 import { ProblemGenerator } from './ibQuestions';
-import { soundManager } from '../services/SoundManager';
 
 // Initial States
 export const INITIAL_PLAYER_STATE: PlayerState = {
@@ -111,7 +110,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             const loaded = { ...INITIAL_PLAYER_STATE, ...action.payload };
             if (!loaded.settings) loaded.settings = INITIAL_PLAYER_STATE.settings;
             if (!loaded.highScore) loaded.highScore = 1;
-            soundManager.setVolumes(loaded.settings.masterVolume, loaded.settings.bgmVolume, loaded.settings.sfxVolume);
             return { ...state, player: loaded };
             
         case 'RESET_GAME':
@@ -145,8 +143,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             
             const prob = ProblemGenerator.generate(1, 1);
             
-            soundManager.setVolumes(state.player.settings.masterVolume, state.player.settings.bgmVolume, state.player.settings.sfxVolume);
-
             return {
                 ...state,
                 phase: 'playing',
@@ -161,7 +157,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             if (action.category === 'master') newSettings.masterVolume = action.value;
             if (action.category === 'bgm') newSettings.bgmVolume = action.value;
             if (action.category === 'sfx') newSettings.sfxVolume = action.value;
-            soundManager.setVolumes(newSettings.masterVolume, newSettings.bgmVolume, newSettings.sfxVolume);
             return { ...state, player: { ...state.player, settings: newSettings } };
         }
         

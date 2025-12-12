@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -64,10 +63,33 @@ class AudioManager {
      * Call this on user interaction.
      */
     public resume() {
-        if (typeof Howler !== 'undefined' && Howler.ctx && Howler.ctx.state === 'suspended') {
-            Howler.ctx.resume().then(() => {
-                console.log("AudioContext Resumed");
-            });
+        if (typeof Howler !== 'undefined' && Howler.ctx) {
+            if (Howler.ctx.state === 'suspended') {
+                Howler.ctx.resume().then(() => {
+                    this.checkMusicHealth();
+                });
+            } else {
+                this.checkMusicHealth();
+            }
+        }
+    }
+    
+    /**
+     * Checks if the music that is SUPPOSED to be playing is ACTUALLY playing.
+     * If not, it restarts it. This fixes the "first run silence" bug.
+     */
+    private checkMusicHealth() {
+        if (this.currentMusicName && this.currentMusicId !== null) {
+            const sound = this.sounds.get(this.currentMusicName);
+            if (sound && !sound.playing(this.currentMusicId)) {
+                console.log("AudioContext resumed, restarting stalled BGM:", this.currentMusicName);
+                const vol = this.musicVol * this.masterVol;
+                
+                // Retrigger
+                this.currentMusicId = sound.play();
+                sound.volume(vol, this.currentMusicId);
+                sound.loop(true, this.currentMusicId);
+            }
         }
     }
 
@@ -146,18 +168,27 @@ class AudioManager {
      * Plays Background Music (BGM) with crossfading.
      */
     public playBGM(name: string, fadeDuration: number = 1500) {
-        // Ensure context is running if we try to play music
-        this.resume();
+        this.resume(); // Ensure context is alive
 
         if (!this.isLoaded) {
             this.pendingMusic = name;
             return;
         }
         
-        if (this.currentMusicName === name) return; // Already playing this track
+        // Block check: If we think we are playing this track, but Howler says no (blocked),
+        // we must fall through to restart it.
+        if (this.currentMusicName === name) {
+            const currentSound = this.sounds.get(name);
+            if (currentSound && this.currentMusicId !== null && currentSound.playing(this.currentMusicId)) {
+                return; // Everything is fine, already playing.
+            }
+            // If we are here, it means we thought we were playing 'name', but we aren't.
+            // Proceed to restart.
+            console.log("Restarting BGM that was blocked/stopped:", name);
+        }
 
-        // 1. Fade out current track
-        if (this.currentMusicName) {
+        // 1. Fade out current track (if it's different or if we are restarting)
+        if (this.currentMusicName && this.currentMusicName !== name) {
             const oldSound = this.sounds.get(this.currentMusicName);
             const oldId = this.currentMusicId;
             if (oldSound && oldId !== null && oldSound.playing(oldId)) {
