@@ -9,15 +9,15 @@
 */
 
 import React, { Component, ErrorInfo, useReducer, useEffect, useRef, useState, ReactNode } from 'react';
-import { gameReducer, initialGameState, INITIAL_PLAYER_STATE } from './utils/gameReducer';
-import { GeometryEngine } from './services/VoxelEngine';
-import { UIOverlay } from './components/UIOverlay';
-import { WelcomeScreen } from './components/WelcomeScreen';
-import { ShopModal } from './components/ShopModal';
-import { FormulaModal } from './components/FormulaModal';
-import { SettingsModal } from './components/SettingsModal';
-import { audio } from './services/AudioManager';
-import { AUDIO_MANIFEST } from './utils/soundConfig';
+import { gameReducer, initialGameState, INITIAL_PLAYER_STATE } from './utils/gameReducer.ts';
+import { GeometryEngine } from './services/VoxelEngine.ts';
+import { UIOverlay } from './components/UIOverlay.tsx';
+import { WelcomeScreen } from './components/WelcomeScreen.tsx';
+import { ShopModal } from './components/ShopModal.tsx';
+import { FormulaModal } from './components/FormulaModal.tsx';
+import { SettingsModal } from './components/SettingsModal.tsx';
+import { audio } from './services/AudioManager.ts';
+import { AUDIO_MANIFEST } from './utils/soundConfig.ts';
 
 interface ErrorBoundaryProps {
     children?: ReactNode;
@@ -27,7 +27,7 @@ interface ErrorBoundaryState {
     hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     public state: ErrorBoundaryState = { hasError: false };
 
     static getDerivedStateFromError() { return { hasError: true }; }
