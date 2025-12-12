@@ -27,12 +27,8 @@ interface ErrorBoundaryState {
     hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     public state: ErrorBoundaryState = { hasError: false };
-    
-    constructor(props: ErrorBoundaryProps) {
-        super(props);
-    }
 
     static getDerivedStateFromError() { return { hasError: true }; }
     componentDidCatch(error: Error, info: ErrorInfo) { console.error(error, info); }

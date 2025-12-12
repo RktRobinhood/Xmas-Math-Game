@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -103,7 +104,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, lives, go
         {/* Main Content */}
         <div className="mt-8 text-center space-y-2 mb-8">
             <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-emerald-400 to-teal-200 tracking-tight drop-shadow-sm">
-                VOXEL<br/>WORKSHOP
+                Trig and Geometry<br/>Workshop
             </h1>
             <p className="text-slate-400 text-sm font-medium tracking-wide uppercase">
                 Santa's Roguelite Math Quest

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -45,7 +46,7 @@ const toRad = (deg: number) => deg * (Math.PI / 180);
 
 // 1. Primitives
 const SimpleCube = (diff: number): Problem => {
-    const s = randInt(3, 8 + diff);
+    const s = randInt(3, 6); // Reduced max height from 8+diff
     return {
         id: createId(), title: "Cube Volume", difficulty: diff, goldReward: 10 + diff,
         shapes: [{ id: '1', type: 'cuboid', position: {x:0,y:0,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:s,height:s,depth:s}, color: COLORS.presents[0] }],
@@ -57,8 +58,8 @@ const SimpleCube = (diff: number): Problem => {
 };
 
 const CylinderVol = (diff: number): Problem => {
-    const r = randInt(2, 5 + diff/2);
-    const h = randInt(5, 10 + diff);
+    const r = randInt(2, 4);
+    const h = randInt(4, 8); // Reduced max height
     return {
         id: createId(), title: "Cylinder Volume", difficulty: diff, goldReward: 15 + diff,
         shapes: [{ id: '1', type: 'cylinder', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h}, color: COLORS.presents[1] }],
@@ -71,16 +72,14 @@ const CylinderVol = (diff: number): Problem => {
 };
 
 const ConeSlant = (diff: number): Problem => {
-    const r = randInt(3, 6);
-    const h = randInt(4, 8);
+    const r = randInt(3, 5);
+    const h = randInt(4, 7); // Reduced max height
     const l = Math.sqrt(r*r + h*h);
     return {
         id: createId(), title: "Cone Slant Height", difficulty: diff, goldReward: 20,
         shapes: [{ id: '1', type: 'cone', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h}, color: COLORS.presents[2] }],
         dimensions: [
-            // Vertical Height (h): From Center Bottom to Center Top, offset to outside
             { start: {x:0, y:0, z:0}, end: {x:0, y:h, z:0}, offset: {x:r + 2, y:0, z:0}, text: `h=${h}` },
-            // Radius (r)
             { start: {x:0, y:0, z:0}, end: {x:r, y:0, z:0}, offset: {x:0,y:-1,z:0}, text: `r=${r}` }
         ],
         stages: [{ id: '1', question: "Find the slant height (l).", answer: l, unit: 'u', hint: 'Pythagoras: l² = h² + r²' }]
@@ -89,17 +88,14 @@ const ConeSlant = (diff: number): Problem => {
 
 // 2. Composite Shapes
 const IceCreamVol = (diff: number): Problem => {
-    const r = randInt(3, 5);
-    const h_cone = randInt(6, 10);
+    const r = randInt(3, 4);
+    const h_cone = randInt(5, 8); // Reduced
     const vol = (Math.PI * r*r * h_cone)/3 + (2/3 * Math.PI * Math.pow(r,3));
     
-    // Inverted logic to place hemi on TOP of flat cone base
     return {
         id: createId(), title: "Ice Cream Volume", difficulty: diff + 1, goldReward: 30,
         shapes: [
-            // Cone point down (y=0), base up (y=h)
             { id: 'cone', type: 'cone', position: {x:0,y:h_cone/2,z:0}, rotation:{x:Math.PI,y:0,z:0}, dims:{radius:r, height:h_cone}, color: COLORS.presents[3] },
-            // Hemi on top
             { id: 'hemi', type: 'hemisphere', position: {x:0,y:h_cone,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r}, color: COLORS.presents[4] }
         ],
         dimensions: [
@@ -111,12 +107,11 @@ const IceCreamVol = (diff: number): Problem => {
 };
 
 const SiloSA = (diff: number): Problem => {
-    const r = randInt(3, 5);
-    const h_cyl = randInt(5, 8);
-    const h_cone = randInt(3, 5);
+    const r = randInt(3, 4);
+    const h_cyl = randInt(4, 7); // Reduced
+    const h_cone = randInt(3, 4);
     const l = Math.sqrt(r*r + h_cone*h_cone);
     
-    // SA = Cyl Curved + Cone Curved + Circle Base (Cyl Top is covered by Cone)
     const sa = (2 * Math.PI * r * h_cyl) + (Math.PI * r * l) + (Math.PI * r * r);
 
     return {
@@ -136,16 +131,16 @@ const SiloSA = (diff: number): Problem => {
 
 // 3. Hollow Shapes
 const HollowPipeVol = (diff: number): Problem => {
-    const R = randInt(4, 6);
+    const R = randInt(4, 5);
     const r = randInt(1, 3);
-    const h = randInt(8, 12);
+    const h = randInt(6, 10); // Reduced
     const vol = Math.PI * h * (R*R - r*r);
 
     return {
         id: createId(), title: "Pipe Volume", difficulty: diff + 1, goldReward: 25,
         shapes: [
             { id: 'outer', type: 'cylinder', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:R, height:h}, color: COLORS.presents[1] },
-            { id: 'inner', type: 'cylinder', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h+0.1}, color: 0x0f172a } // Dark inner to simulate hole
+            { id: 'inner', type: 'cylinder', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h+0.1}, color: 0x0f172a }
         ],
         dimensions: [
             { start: {x:0, y:h, z:0}, end: {x:R, y:h, z:0}, offset: {x:0,y:1,z:0}, text: `R=${R}` },
@@ -156,15 +151,13 @@ const HollowPipeVol = (diff: number): Problem => {
     };
 };
 
-// 4. Frustums
 const ConeFrustumVol = (diff: number): Problem => {
-    const R = randInt(5, 8);
+    const R = randInt(5, 7);
     const r = randInt(2, 4);
-    const h = randInt(6, 10);
-    // V = (πh/3)(R² + Rr + r²)
+    const h = randInt(5, 8); // Reduced
     const vol = (Math.PI * h / 3) * (R*R + R*r + r*r);
     
-    // Ghost Height calculation (Similar triangles)
+    // Ghost Height calculation
     const H_total = (h * R) / (R - r);
     const h_missing = H_total - h;
 
@@ -172,11 +165,10 @@ const ConeFrustumVol = (diff: number): Problem => {
         id: createId(), title: "Frustum Volume", difficulty: diff + 3, goldReward: 45,
         shapes: [
             { id: 'frustum', type: 'cone', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:R, radiusTop:r, height:h}, color: COLORS.presents[2] },
-            // Ghost Cone Tip
-            { id: 'ghost', type: 'cone', position: {x:0,y:h + h_missing/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h_missing}, color: 0xffffff } // Should be handled as ghost in Engine
+            { id: 'ghost', type: 'cone', position: {x:0,y:h + h_missing/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h_missing}, color: 0xffffff }
         ],
         dimensions: [
-            { start: {x:R, y:0, z:0}, end: {x:r, y:h, z:0}, offset: {x:1,y:0,z:0}, text: `h=${h}` }, // Vertical h
+            { start: {x:R, y:0, z:0}, end: {x:r, y:h, z:0}, offset: {x:1,y:0,z:0}, text: `h=${h}` },
             { start: {x:0, y:0, z:R}, end: {x:R, y:0, z:R}, offset: {x:0,y:0,z:1}, text: `R=${R}` },
             { start: {x:0, y:h, z:r}, end: {x:r, y:h, z:r}, offset: {x:0,y:0,z:1}, text: `r=${r}` }
         ],
@@ -187,7 +179,7 @@ const ConeFrustumVol = (diff: number): Problem => {
 // 5. Trigonometry
 
 const TrigFindHeight = (diff: number): Problem => {
-    const base = randInt(10, 20);
+    const base = randInt(8, 15); // Reduced base
     const angle = randInt(25, 60);
     const rad = toRad(angle);
     const height = base * Math.tan(rad);
@@ -208,7 +200,7 @@ const TrigFindHeight = (diff: number): Problem => {
 };
 
 const TrigFindSlant = (diff: number): Problem => {
-    const h = randInt(10, 15);
+    const h = randInt(8, 12); // Reduced height
     const angle = randInt(30, 60);
     const rad = toRad(angle);
     const l = h / Math.sin(rad);
@@ -227,9 +219,8 @@ const TrigFindSlant = (diff: number): Problem => {
 };
 
 const TrigRamp = (diff: number): Problem => {
-    // Triangular prism laid on its side to look like a ramp
-    const base = randInt(8, 15);
-    const height = randInt(5, 12);
+    const base = randInt(8, 12);
+    const height = randInt(5, 8); // Reduced
     const angle = toDeg(Math.atan(height/base));
 
     return {
@@ -247,8 +238,8 @@ const TrigRamp = (diff: number): Problem => {
 };
 
 const TrigConeApex = (diff: number): Problem => {
-    const r = randInt(5, 10);
-    const h = randInt(8, 15);
+    const r = randInt(4, 6);
+    const h = randInt(6, 10); // Reduced
     const halfAngle = toDeg(Math.atan(r/h));
     const fullAngle = halfAngle * 2;
 
@@ -268,8 +259,8 @@ const TrigConeApex = (diff: number): Problem => {
 }
 
 const TrigPyramidEdge = (diff: number): Problem => {
-    const base = randInt(10, 16); 
-    const h = randInt(8, 12);
+    const base = randInt(8, 12); // Reduced
+    const h = randInt(6, 10); // Reduced
     const diag = Math.sqrt(base*base + base*base);
     const halfDiag = diag / 2;
     const angle = toDeg(Math.atan(h / halfDiag));
@@ -289,9 +280,9 @@ const TrigPyramidEdge = (diff: number): Problem => {
 }
 
 const TrigCuboidSpace = (diff: number): Problem => {
-    const w = randInt(6, 10);
-    const d = randInt(6, 10);
-    const h = randInt(5, 8);
+    const w = randInt(5, 8);
+    const d = randInt(5, 8);
+    const h = randInt(4, 7); // Reduced
     const floorDiag = Math.sqrt(w*w + d*d);
     const angle = toDeg(Math.atan(h / floorDiag));
 
@@ -318,19 +309,19 @@ const BossNutcracker = (level: number): Problem => {
         id: createId(), title: "General Nutcracker", difficulty: 5, goldReward: 200, isBoss: true, bossName: "Nutcracker", bossAvatar: "💂", bossType: 'main', bossMusicTheme: 'nutcracker', bossHP: 100,
         dropTable: [BOSS_LOOT[0]], 
         shapes: [
-            { id: 'body', type: 'cuboid', position: {x:0,y:10,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:10, height:15, depth:6}, color: COLORS.presents[0] },
-            { id: 'head', type: 'cuboid', position: {x:0,y:20,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:8, height:8, depth:8}, color: COLORS.presents[4] }
+            { id: 'body', type: 'cuboid', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:8, height:12, depth:5}, color: COLORS.presents[0] },
+            { id: 'head', type: 'cuboid', position: {x:0,y:17,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:6, height:6, depth:6}, color: COLORS.presents[4] }
         ],
         stages: [
-            { id: '1', question: "Calculate volume of the BODY (Red Prism).", answer: 10*15*6, unit: 'u³' },
-            { id: '2', question: "Calculate surface area of HEAD (White Cube).", answer: 6*(8*8), unit: 'u²' },
-            { id: '3', question: "The Hat (not shown) is a cone with r=4, h=3. Find its Volume.", answer: (Math.PI*16*3)/3, unit: 'u³' },
+            { id: '1', question: "Calculate volume of the BODY (Red Prism).", answer: 8*12*5, unit: 'u³' },
+            { id: '2', question: "Calculate surface area of HEAD (White Cube).", answer: 6*(6*6), unit: 'u²' },
+            { id: '3', question: "The Hat (not shown) is a cone with r=3, h=4. Find its Volume.", answer: (Math.PI*9*4)/3, unit: 'u³' },
             { id: '4', question: "Find the Slant Height of that Hat.", answer: 5, unit: 'u' },
-            { id: '5', question: "Total Height of Body + Head.", answer: 15 + 8, unit: 'u' }
+            { id: '5', question: "Total Height of Body + Head.", answer: 12 + 6, unit: 'u' }
         ],
         dimensions: [
-             { start: {x:-5, y:2.5, z:3}, end: {x:5, y:2.5, z:3}, offset: {x:0,y:-1,z:0}, text: 'w=10' },
-             { start: {x:5, y:2.5, z:3}, end: {x:5, y:17.5, z:3}, offset: {x:1,y:0,z:0}, text: 'h_body=15' }
+             { start: {x:-4, y:2, z:2.5}, end: {x:4, y:2, z:2.5}, offset: {x:0,y:-1,z:0}, text: 'w=8' },
+             { start: {x:4, y:2, z:2.5}, end: {x:4, y:14, z:2.5}, offset: {x:1,y:0,z:0}, text: 'h_body=12' }
         ]
     };
 }
@@ -340,19 +331,19 @@ const BossKrampus = (level: number): Problem => {
         id: createId(), title: "Krampus Lair", difficulty: 7, goldReward: 400, isBoss: true, bossName: "Krampus", bossAvatar: "👹", bossType: 'main', bossMusicTheme: 'krampus', bossHP: 200,
         dropTable: [BOSS_LOOT[1]], 
         shapes: [
-            { id: 'cage', type: 'cylinder', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:6, height:16}, color: 0x334155 },
-            { id: 'horn', type: 'cone', position: {x:5,y:18,z:0}, rotation:{x:0,y:0,z:-0.5}, dims:{radius:2, height:10}, color: 0x9f1239 }
+            { id: 'cage', type: 'cylinder', position: {x:0,y:6,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:5, height:12}, color: 0x334155 },
+            { id: 'horn', type: 'cone', position: {x:4,y:14,z:0}, rotation:{x:0,y:0,z:-0.5}, dims:{radius:2, height:8}, color: 0x9f1239 }
         ],
         stages: [
-            { id: '1', question: "Volume of the Cage (Cylinder).", answer: Math.PI*6*6*16, unit: 'u³' },
-            { id: '2', question: "Curved Surface Area of the Cage.", answer: 2*Math.PI*6*16, unit: 'u²' },
-            { id: '3', question: "Volume of the Horn (Cone).", answer: (Math.PI*2*2*10)/3, unit: 'u³' },
-            { id: '4', question: "Slant height of the Horn.", answer: Math.sqrt(100+4), unit: 'u' },
-            { id: '5', question: "Distance from Cage base center to Horn tip (approx coords).", answer: Math.sqrt(5*5 + 18*18), unit: 'u', hint: '3D Pythagoras' }
+            { id: '1', question: "Volume of the Cage (Cylinder).", answer: Math.PI*25*12, unit: 'u³' },
+            { id: '2', question: "Curved Surface Area of the Cage.", answer: 2*Math.PI*5*12, unit: 'u²' },
+            { id: '3', question: "Volume of the Horn (Cone).", answer: (Math.PI*4*8)/3, unit: 'u³' },
+            { id: '4', question: "Slant height of the Horn.", answer: Math.sqrt(64+4), unit: 'u' },
+            { id: '5', question: "Distance from Cage base center to Horn tip (approx coords).", answer: Math.sqrt(4*4 + 14*14), unit: 'u', hint: '3D Pythagoras' }
         ],
         dimensions: [
-            { start: {x:-6, y:0, z:0}, end: {x:6, y:0, z:0}, offset: {x:0,y:-1,z:0}, text: 'd=12' },
-            { start: {x:6, y:0, z:0}, end: {x:6, y:16, z:0}, offset: {x:1,y:0,z:0}, text: 'h=16' }
+            { start: {x:-5, y:0, z:0}, end: {x:5, y:0, z:0}, offset: {x:0,y:-1,z:0}, text: 'd=10' },
+            { start: {x:5, y:0, z:0}, end: {x:5, y:12, z:0}, offset: {x:1,y:0,z:0}, text: 'h=12' }
         ]
     };
 }
@@ -362,19 +353,19 @@ const BossMechaSanta = (level: number): Problem => {
         id: createId(), title: "Mecha-Santa Protocol", difficulty: 9, goldReward: 600, isBoss: true, bossName: "Mecha-Santa", bossAvatar: "🤖", bossType: 'main', bossMusicTheme: 'mecha', bossHP: 300,
         dropTable: [BOSS_LOOT[2]], 
         shapes: [
-            { id: 'torso', type: 'cuboid', position: {x:0,y:10,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:12, height:14, depth:8}, color: 0x94a3b8 },
-            { id: 'core', type: 'sphere', position: {x:0,y:10,z:4}, rotation:{x:0,y:0,z:0}, dims:{radius:3}, color: 0xef4444 }
+            { id: 'torso', type: 'cuboid', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:10, height:12, depth:6}, color: 0x94a3b8 },
+            { id: 'core', type: 'sphere', position: {x:0,y:8,z:3}, rotation:{x:0,y:0,z:0}, dims:{radius:2}, color: 0xef4444 }
         ],
         stages: [
-            { id: '1', question: "Volume of Torso (Cuboid).", answer: 12*14*8, unit: 'u³' },
-            { id: '2', question: "Volume of Reactor Core (Sphere).", answer: (4/3)*Math.PI*27, unit: 'u³' },
-            { id: '3', question: "Surface Area of Reactor Core.", answer: 4*Math.PI*9, unit: 'u²' },
-            { id: '4', question: "Space remaining in torso if Core was inside.", answer: (12*14*8) - ((4/3)*Math.PI*27), unit: 'u³' },
-            { id: '5', question: "Diagonal of the Torso.", answer: Math.sqrt(12*12 + 14*14 + 8*8), unit: 'u' }
+            { id: '1', question: "Volume of Torso (Cuboid).", answer: 10*12*6, unit: 'u³' },
+            { id: '2', question: "Volume of Reactor Core (Sphere).", answer: (4/3)*Math.PI*8, unit: 'u³' },
+            { id: '3', question: "Surface Area of Reactor Core.", answer: 4*Math.PI*4, unit: 'u²' },
+            { id: '4', question: "Space remaining in torso if Core was inside.", answer: (10*12*6) - ((4/3)*Math.PI*8), unit: 'u³' },
+            { id: '5', question: "Diagonal of the Torso.", answer: Math.sqrt(10*10 + 12*12 + 6*6), unit: 'u' }
         ],
         dimensions: [
-             { start: {x:-6, y:3, z:4}, end: {x:6, y:3, z:4}, offset: {x:0,y:-1,z:0}, text: 'w=12' },
-             { start: {x:6, y:3, z:4}, end: {x:6, y:17, z:4}, offset: {x:1,y:0,z:0}, text: 'h=14' }
+             { start: {x:-5, y:2, z:3}, end: {x:5, y:2, z:3}, offset: {x:0,y:-1,z:0}, text: 'w=10' },
+             { start: {x:5, y:2, z:3}, end: {x:5, y:14, z:3}, offset: {x:1,y:0,z:0}, text: 'h=12' }
         ]
     };
 }
@@ -384,14 +375,14 @@ const BossYeti = (level: number): Problem => {
         id: createId(), title: "Yeti King", difficulty: 6, goldReward: 250, isBoss: true, bossName: "Yeti King", bossAvatar: "🦍", bossType: 'main', bossMusicTheme: 'boss', bossHP: 150,
         dropTable: [BOSS_LOOT[0]],
         shapes: [
-            { id: 'body', type: 'hemisphere', position: {x:0,y:0,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:8}, color: 0xffffff },
-            { id: 'head', type: 'cuboid', position: {x:0,y:10,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:6,height:6,depth:6}, color: 0xbae6fd }
+            { id: 'body', type: 'hemisphere', position: {x:0,y:0,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:6}, color: 0xffffff },
+            { id: 'head', type: 'cuboid', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:5,height:5,depth:5}, color: 0xbae6fd }
         ],
         stages: [
-            { id: '1', question: "Volume of Body (Hemisphere, r=8).", answer: (2/3)*Math.PI*512, unit: 'u³' },
-            { id: '2', question: "Surface Area of the Body (Curved + Base).", answer: 3*Math.PI*64, unit: 'u²' },
-            { id: '3', question: "Volume of Head (Cube, s=6).", answer: 216, unit: 'u³' },
-            { id: '4', question: "Total Volume.", answer: ((2/3)*Math.PI*512) + 216, unit: 'u³' }
+            { id: '1', question: "Volume of Body (Hemisphere, r=6).", answer: (2/3)*Math.PI*216, unit: 'u³' },
+            { id: '2', question: "Surface Area of the Body (Curved + Base).", answer: 3*Math.PI*36, unit: 'u²' },
+            { id: '3', question: "Volume of Head (Cube, s=5).", answer: 125, unit: 'u³' },
+            { id: '4', question: "Total Volume.", answer: ((2/3)*Math.PI*216) + 125, unit: 'u³' }
         ]
      }
 }
@@ -401,89 +392,86 @@ const BossDarkElf = (level: number): Problem => {
         id: createId(), title: "Dark Elf Sorcerer", difficulty: 8, goldReward: 350, isBoss: true, bossName: "Malekith", bossAvatar: "🧝", bossType: 'main', bossMusicTheme: 'boss', bossHP: 200,
         dropTable: [BOSS_LOOT[2]],
         shapes: [
-            { id: 'tower', type: 'hex_prism', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:6, height:16}, color: 0x4c1d95 }
+            { id: 'tower', type: 'hex_prism', position: {x:0,y:7,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:5, height:14}, color: 0x4c1d95 }
         ],
         stages: [
-            { id: '1', question: "Area of Hexagon Base (s=6).", answer: (3*Math.sqrt(3)/2)*36, unit: 'u²', hint: 'Area = (3√3 / 2) * s²' },
-            { id: '2', question: "Volume of Tower (Area * h).", answer: ((3*Math.sqrt(3)/2)*36) * 16, unit: 'u³' },
-            { id: '3', question: "Lateral Surface Area (6 rectangles).", answer: 6 * 6 * 16, unit: 'u²' }
+            { id: '1', question: "Area of Hexagon Base (s=5).", answer: (3*Math.sqrt(3)/2)*25, unit: 'u²', hint: 'Area = (3√3 / 2) * s²' },
+            { id: '2', question: "Volume of Tower (Area * h).", answer: ((3*Math.sqrt(3)/2)*25) * 14, unit: 'u³' },
+            { id: '3', question: "Lateral Surface Area (6 rectangles).", answer: 6 * 5 * 14, unit: 'u²' }
         ],
         dimensions: [
-            { start: {x:0,y:0,z:0}, end: {x:6,y:0,z:0}, offset: {x:0,y:0,z:1}, text: 's=6' },
-            { start: {x:6,y:0,z:0}, end: {x:6,y:16,z:0}, offset: {x:1,y:0,z:0}, text: 'h=16' }
+            { start: {x:0,y:0,z:0}, end: {x:5,y:0,z:0}, offset: {x:0,y:0,z:1}, text: 's=5' },
+            { start: {x:5,y:0,z:0}, end: {x:5,y:14,z:0}, offset: {x:1,y:0,z:0}, text: 'h=14' }
         ]
      }
 }
 
 const BossGeometer = (level: number): Problem => {
     // Pure Abstract Shapes - TRIG BOSS
-    const base = 20;
-    const h = 20;
-    const diag = Math.sqrt(20*20 + 20*20 + 20*20);
-    const angle = toDeg(Math.atan(20 / Math.sqrt(800)));
+    const base = 16;
+    const h = 16;
+    const diag = Math.sqrt(16*16 + 16*16 + 16*16);
+    const angle = toDeg(Math.atan(16 / Math.sqrt(512)));
     
     return {
         id: createId(), title: "The Geometer", difficulty: 10, goldReward: 500, isBoss: true, bossName: "The Geometer", bossAvatar: "📐", bossType: 'main', bossMusicTheme: 'mecha', bossHP: 250,
         dropTable: [BOSS_LOOT[3]],
         shapes: [
-            // Wireframe Cuboid
-            { id: 'cube', type: 'cuboid', position: {x:0,y:10,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:20,height:20,depth:20}, color: 0x64748b },
-            // Internal Triangle
-            { id: 'pyr', type: 'pyramid', position: {x:0,y:10,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:20, height:20}, color: 0xfacc15 }
+            { id: 'cube', type: 'cuboid', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:16,height:16,depth:16}, color: 0x64748b },
+            { id: 'pyr', type: 'pyramid', position: {x:0,y:8,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:16, height:16}, color: 0xfacc15 }
         ],
         stages: [
-            { id: '1', question: "Find Space Diagonal of the Cube (s=20).", answer: diag, unit: 'u' },
+            { id: '1', question: "Find Space Diagonal of the Cube (s=16).", answer: diag, unit: 'u' },
             { id: '2', question: "Angle between Space Diagonal and Floor.", answer: angle, unit: '°' },
-            { id: '3', question: "Volume of the internal Pyramid.", answer: (400*20)/3, unit: 'u³' },
-            { id: '4', question: "Surface Area of the Cube.", answer: 6*400, unit: 'u²' },
-            { id: '5', question: "Angle of Elevation of Pyramid Edge.", answer: toDeg(Math.atan(20 / (Math.sqrt(800)/2))), unit: '°' }
+            { id: '3', question: "Volume of the internal Pyramid.", answer: (256*16)/3, unit: 'u³' },
+            { id: '4', question: "Surface Area of the Cube.", answer: 6*256, unit: 'u²' },
+            { id: '5', question: "Angle of Elevation of Pyramid Edge.", answer: toDeg(Math.atan(16 / (Math.sqrt(512)/2))), unit: '°' }
         ],
         dimensions: [
-            { start: {x:-10,y:0,z:10}, end: {x:10,y:0,z:10}, offset: {x:0,y:-1,z:0}, text: 's=20' },
-            { start: {x:10,y:0,z:10}, end: {x:10,y:20,z:10}, offset: {x:1,y:0,z:0}, text: 'h=20' }
+            { start: {x:-8,y:0,z:8}, end: {x:8,y:0,z:8}, offset: {x:0,y:-1,z:0}, text: 's=16' },
+            { start: {x:8,y:0,z:8}, end: {x:8,y:16,z:8}, offset: {x:1,y:0,z:0}, text: 'h=16' }
         ]
     }
 }
 
 
 // --- MINI BOSSES (Lvl 5, 15, 25...) ---
-// (Unchanged mini bosses omitted for brevity but presumed included in full file)
 const MiniBossSled = (level: number): Problem => {
     return {
         id: createId(), title: "Grinch Sled", difficulty: 4, goldReward: 100, isBoss: true, bossName: "The Grinch", bossAvatar: "🛷", bossType: 'mini', bossMusicTheme: 'miniboss', bossHP: 50,
         shapes: [
-            { id: 'base', type: 'cuboid', position: {x:0,y:2,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:12, height:4, depth:8}, color: COLORS.presents[2] },
-            { id: 'seat', type: 'cuboid', position: {x:-2,y:6,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:4, height:4, depth:6}, color: COLORS.presents[0] }
+            { id: 'base', type: 'cuboid', position: {x:0,y:2,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:10, height:4, depth:6}, color: COLORS.presents[2] },
+            { id: 'seat', type: 'cuboid', position: {x:-2,y:5,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:4, height:4, depth:4}, color: COLORS.presents[0] }
         ],
         stages: [
-             { id: '1', question: "Volume of the base.", answer: 12*4*8, unit: 'u³' },
-             { id: '2', question: "Volume of the seat.", answer: 4*4*6, unit: 'u³' },
-             { id: '3', question: "Total Volume.", answer: (12*4*8) + (4*4*6), unit: 'u³' }
+             { id: '1', question: "Volume of the base.", answer: 10*4*6, unit: 'u³' },
+             { id: '2', question: "Volume of the seat.", answer: 4*4*4, unit: 'u³' },
+             { id: '3', question: "Total Volume.", answer: (10*4*6) + (4*4*4), unit: 'u³' }
         ],
         dimensions: [
-             { start: {x:-6, y:0, z:4}, end: {x:6, y:0, z:4}, offset: {x:0,y:0,z:1}, text: 'L=12' },
-             { start: {x:6, y:0, z:4}, end: {x:6, y:0, z:-4}, offset: {x:1,y:0,z:0}, text: 'W=8' }
+             { start: {x:-5, y:0, z:3}, end: {x:5, y:0, z:3}, offset: {x:0,y:0,z:1}, text: 'L=10' },
+             { start: {x:5, y:0, z:3}, end: {x:5, y:0, z:-3}, offset: {x:1,y:0,z:0}, text: 'W=6' }
         ]
     };
 }
 
 const MiniBossHouse = (level: number): Problem => {
-    const s = 10;
-    const h_roof = 6;
+    const s = 8;
+    const h_roof = 5;
     return {
         id: createId(), title: "Gingerbread House", difficulty: 5, goldReward: 120, isBoss: true, bossName: "Cookie Monster", bossAvatar: "🏠", bossType: 'mini', bossMusicTheme: 'miniboss', bossHP: 60,
         shapes: [
-            { id: 'base', type: 'cuboid', position: {x:0,y:5,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:s, height:s, depth:s}, color: 0xcd853f },
-            { id: 'roof', type: 'pyramid', position: {x:0,y:10 + h_roof/2,z:0}, rotation:{x:0,y:Math.PI/4,z:0}, dims:{radius:s, height:h_roof}, color: 0xffffff }
+            { id: 'base', type: 'cuboid', position: {x:0,y:4,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:s, height:s, depth:s}, color: 0xcd853f },
+            { id: 'roof', type: 'pyramid', position: {x:0,y:8 + h_roof/2,z:0}, rotation:{x:0,y:Math.PI/4,z:0}, dims:{radius:s, height:h_roof}, color: 0xffffff }
         ],
         stages: [
-            { id: '1', question: "Volume of the base (Cube).", answer: 1000, unit: 'u³' },
-            { id: '2', question: "Volume of the roof (Pyramid).", answer: (100*6)/3, unit: 'u³' },
-            { id: '3', question: "Slant height of the roof.", answer: Math.sqrt(25 + 36), unit: 'u', hint: 'l² = (w/2)² + h²' }
+            { id: '1', question: "Volume of the base (Cube).", answer: 512, unit: 'u³' },
+            { id: '2', question: "Volume of the roof (Pyramid).", answer: (64*5)/3, unit: 'u³' },
+            { id: '3', question: "Slant height of the roof.", answer: Math.sqrt(16 + 25), unit: 'u', hint: 'l² = (w/2)² + h²' }
         ],
         dimensions: [
-            { start: {x:-5, y:0, z:5}, end: {x:5, y:0, z:5}, offset: {x:0,y:-1,z:0}, text: 's=10' },
-            { start: {x:5, y:10, z:5}, end: {x:5, y:16, z:5}, offset: {x:1,y:0,z:0}, text: 'h=6' }
+            { start: {x:-4, y:0, z:4}, end: {x:4, y:0, z:4}, offset: {x:0,y:-1,z:0}, text: 's=8' },
+            { start: {x:4, y:8, z:4}, end: {x:4, y:13, z:4}, offset: {x:1,y:0,z:0}, text: 'h=5' }
         ]
     }
 }
@@ -532,17 +520,17 @@ const MiniBossTree = (level: number): Problem => {
         id: createId(), title: "Evergreen Sentinel", difficulty: 5, goldReward: 120, isBoss: true, bossName: "Timber", bossAvatar: "🌲", bossType: 'mini', bossMusicTheme: 'miniboss', bossHP: 60,
         shapes: [
             { id: 'trunk', type: 'cylinder', position: {x:0,y:2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:2, height:4}, color: 0x451a03 },
-            { id: 'leaves', type: 'cone', position: {x:0,y:12,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:6, height:16}, color: 0x15803d }
+            { id: 'leaves', type: 'cone', position: {x:0,y:10,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:6, height:12}, color: 0x15803d }
         ],
         stages: [
             { id: '1', question: "Volume of Trunk (Cylinder).", answer: Math.PI*4*4, unit: 'u³' },
-            { id: '2', question: "Volume of Leaves (Cone).", answer: (Math.PI*36*16)/3, unit: 'u³' },
-            { id: '3', question: "Slant height of Leaves.", answer: Math.sqrt(6*6 + 16*16), unit: 'u' }
+            { id: '2', question: "Volume of Leaves (Cone).", answer: (Math.PI*36*12)/3, unit: 'u³' },
+            { id: '3', question: "Slant height of Leaves.", answer: Math.sqrt(6*6 + 12*12), unit: 'u' }
         ],
         dimensions: [
              { start: {x:-2, y:0, z:2}, end: {x:2, y:0, z:2}, offset: {x:0,y:0,z:0}, text: 'd_trunk=4' },
              { start: {x:-6, y:4, z:0}, end: {x:6, y:4, z:0}, offset: {x:0,y:0,z:1}, text: 'd_cone=12' },
-             { start: {x:6, y:4, z:0}, end: {x:6, y:20, z:0}, offset: {x:1,y:0,z:0}, text: 'h_cone=16' }
+             { start: {x:6, y:4, z:0}, end: {x:6, y:16, z:0}, offset: {x:1,y:0,z:0}, text: 'h_cone=12' }
         ]
     }
 }
@@ -551,14 +539,14 @@ const MiniBossMimic = (level: number): Problem => {
     return {
         id: createId(), title: "Surprise Gift", difficulty: 7, goldReward: 160, isBoss: true, bossName: "Mimic", bossAvatar: "🎁", bossType: 'mini', bossMusicTheme: 'miniboss', bossHP: 80,
         shapes: [
-             { id: 'box', type: 'cuboid', position: {x:0,y:5,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:10,height:10,depth:10}, color: COLORS.presents[3] }
+             { id: 'box', type: 'cuboid', position: {x:0,y:4,z:0}, rotation:{x:0,y:0,z:0}, dims:{width:8,height:8,depth:8}, color: COLORS.presents[3] }
         ],
         stages: [
-            { id: '1', question: "Surface Area of the Cube (s=10).", answer: 600, unit: 'u²' },
-            { id: '2', question: "Space Diagonal length.", answer: Math.sqrt(300), unit: 'u' }
+            { id: '1', question: "Surface Area of the Cube (s=8).", answer: 384, unit: 'u²' },
+            { id: '2', question: "Space Diagonal length.", answer: Math.sqrt(192), unit: 'u' }
         ],
         dimensions: [
-            { start: {x:-5,y:0,z:5}, end: {x:5,y:0,z:5}, offset: {x:0,y:-1,z:0}, text: 's=10' }
+            { start: {x:-4,y:0,z:4}, end: {x:4,y:0,z:4}, offset: {x:0,y:-1,z:0}, text: 's=8' }
         ]
     }
 }
@@ -567,12 +555,12 @@ const MiniBossReindeer = (level: number): Problem => {
     return {
         id: createId(), title: "Robo-Rudolph", difficulty: 6, goldReward: 150, isBoss: true, bossName: "R-3000", bossAvatar: "🦌", bossType: 'mini', bossMusicTheme: 'miniboss', bossHP: 70,
         shapes: [
-            { id: 'body', type: 'cylinder', position: {x:0,y:5,z:0}, rotation:{x:Math.PI/2,y:0,z:0}, dims:{radius:4, height:12}, color: 0x78350f },
+            { id: 'body', type: 'cylinder', position: {x:0,y:5,z:0}, rotation:{x:Math.PI/2,y:0,z:0}, dims:{radius:4, height:10}, color: 0x78350f },
             { id: 'legs', type: 'cuboid', position: {x:0,y:2,z:-4}, rotation:{x:0,y:0,z:0}, dims:{width:2, height:4, depth:2}, color: 0x000000 }
         ],
         stages: [
-            { id: '1', question: "Volume of Body (Cylinder, r=4, h=12).", answer: Math.PI*16*12, unit: 'u³' },
-            { id: '2', question: "Surface Area of Body.", answer: (2*Math.PI*4*12) + (2*Math.PI*16), unit: 'u²' }
+            { id: '1', question: "Volume of Body (Cylinder, r=4, h=10).", answer: Math.PI*16*10, unit: 'u³' },
+            { id: '2', question: "Surface Area of Body.", answer: (2*Math.PI*4*10) + (2*Math.PI*16), unit: 'u²' }
         ]
     }
 }

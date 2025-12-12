@@ -124,7 +124,6 @@ class SimpleOrbitControls {
     }
     
     public dispose() {
-        // Cleanup listeners
         this.domElement.removeEventListener('mousedown', this.onMouseDown);
         document.removeEventListener('mousemove', this.onMouseMove);
         document.removeEventListener('mouseup', this.onMouseUp);
@@ -148,12 +147,15 @@ export class GeometryEngine {
   private anglesGroup: THREE.Group = new THREE.Group();
   private measureLineGroup: THREE.Group = new THREE.Group();
   private previewLineGroup: THREE.Group = new THREE.Group();
-  private snapMarkersGroup: THREE.Group = new THREE.Group(); // Visual markers for all valid points
+  private snapMarkersGroup: THREE.Group = new THREE.Group(); 
   
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
+  private mouseDownPos = new THREE.Vector2();
   
   private isMeasuring = false;
+  private measureState: 0 | 1 | 2 = 0; 
+  
   private snapPoints: { position: THREE.Vector3, type: string }[] = [];
   private activeSnapPoint: THREE.Vector3 | null = null;
   private measureStart: THREE.Vector3 | null = null;
@@ -197,16 +199,18 @@ export class GeometryEngine {
 
     this.setupSnow();
 
-    // Snap Highlight (The active cursor)
+    // Snap Highlight - Larger for visibility
     this.highlightMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.5), 
+        new THREE.SphereGeometry(0.6), 
         new THREE.MeshBasicMaterial({ color: 0xff1493, depthTest: false, transparent: true, opacity: 0.8 })
     );
     this.highlightMesh.visible = false;
+    this.highlightMesh.renderOrder = 9999; // Ensure on top
     this.scene.add(this.highlightMesh);
 
     // Interaction Listeners
     this.container.addEventListener('pointerdown', this.onPointerDown);
+    this.container.addEventListener('pointerup', this.onPointerUp);
     this.container.addEventListener('pointermove', this.onPointerMove);
     this.container.addEventListener('touchstart', this.onTouchMove, { passive: false }); 
     
@@ -234,6 +238,7 @@ export class GeometryEngine {
       cancelAnimationFrame(this.animationId);
       this.controls.dispose();
       this.container.removeEventListener('pointerdown', this.onPointerDown);
+      this.container.removeEventListener('pointerup', this.onPointerUp);
       this.container.removeEventListener('pointermove', this.onPointerMove);
       this.renderer.dispose();
   }
@@ -269,31 +274,24 @@ export class GeometryEngine {
 
   // --- Scene Loading ---
   public loadScene(shapes: ShapeSpec[], labels: LabelSpec[], angles: AngleSpec[], dimensions: DimensionSpec[]) {
-      // Clear Old
       this.shapes.clear();
       this.labelsGroup.clear();
       this.dimensionsGroup.clear();
       this.anglesGroup.clear();
-      this.measureLineGroup.clear();
-      this.previewLineGroup.clear();
+      this.resetMeasurement();
       this.snapMarkersGroup.clear();
       this.snapPoints = [];
-      this.measureStart = null;
-      this.onMeasureChange(null);
 
-      // Add Shapes
       shapes.forEach(spec => {
           const mesh = this.createShapeMesh(spec);
           this.shapes.add(mesh);
           this.generateSnapPoints(spec);
       });
 
-      // Add Visuals
       labels.forEach(l => this.createLabel(l));
       dimensions.forEach(d => this.createDimension(d));
       angles.forEach(a => this.createAngle(a));
       
-      // If we are already measuring, update markers
       if (this.isMeasuring) {
           this.showSnapMarkers();
       }
@@ -338,7 +336,6 @@ export class GeometryEngine {
   
   // --- Snapping ---
   private generateSnapPoints(spec: ShapeSpec) {
-      // Calculate world matrix to transform local points to world space
       const dummy = new THREE.Object3D();
       dummy.position.set(spec.position.x, spec.position.y, spec.position.z);
       dummy.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z);
@@ -349,63 +346,41 @@ export class GeometryEngine {
           this.snapPoints.push({ position: worldPos, type });
       };
 
-      // 1. Center (Centroid)
       addPoint(new THREE.Vector3(0,0,0), 'center');
       
-      // 2. Vertices & Cardinal Points
       if (spec.dims.height) {
           const h = spec.dims.height;
-          // Top/Bottom Centers
           addPoint(new THREE.Vector3(0, h/2, 0), 'center_top');
           addPoint(new THREE.Vector3(0, -h/2, 0), 'center_bottom');
       }
 
       if (spec.dims.width && spec.dims.height && spec.dims.depth) { 
-          // Box Corners
           const w = spec.dims.width/2; 
           const h = spec.dims.height/2; 
           const d = spec.dims.depth/2;
           
-          addPoint(new THREE.Vector3(w, h, d), 'vertex');
-          addPoint(new THREE.Vector3(-w, h, d), 'vertex');
-          addPoint(new THREE.Vector3(w, -h, d), 'vertex');
-          addPoint(new THREE.Vector3(-w, -h, d), 'vertex');
-          
-          addPoint(new THREE.Vector3(w, h, -d), 'vertex');
-          addPoint(new THREE.Vector3(-w, h, -d), 'vertex');
-          addPoint(new THREE.Vector3(w, -h, -d), 'vertex');
-          addPoint(new THREE.Vector3(-w, -h, -d), 'vertex');
+          [w, -w].forEach(x => {
+              [h, -h].forEach(y => {
+                  [d, -d].forEach(z => {
+                      addPoint(new THREE.Vector3(x, y, z), 'vertex');
+                  });
+              });
+          });
       }
       
       if (spec.dims.radius) {
           const r = spec.dims.radius;
           const h = spec.dims.height ? spec.dims.height/2 : 0;
           
-          // Cardinal points on rims (North, South, East, West)
-          if (spec.type === 'cylinder' || spec.type === 'cone' || spec.type === 'pyramid' || spec.type === 'frustum' || spec.type === 'tri_prism' || spec.type === 'hex_prism') {
-               // Bottom Rim
-               addPoint(new THREE.Vector3(r, -h, 0), 'rim');
-               addPoint(new THREE.Vector3(-r, -h, 0), 'rim');
-               addPoint(new THREE.Vector3(0, -h, r), 'rim');
-               addPoint(new THREE.Vector3(0, -h, -r), 'rim');
-               
-               // Top Rim (if Cylinder)
-               if (spec.type === 'cylinder' || spec.type === 'hex_prism' || spec.type === 'tri_prism') {
-                   addPoint(new THREE.Vector3(r, h, 0), 'rim');
-                   addPoint(new THREE.Vector3(-r, h, 0), 'rim');
-                   addPoint(new THREE.Vector3(0, h, r), 'rim');
-                   addPoint(new THREE.Vector3(0, h, -r), 'rim');
+          if (['cylinder','cone','pyramid','frustum','tri_prism','hex_prism'].includes(spec.type)) {
+               [[r, -h, 0], [-r, -h, 0], [0, -h, r], [0, -h, -r]].forEach(p => addPoint(new THREE.Vector3(p[0], p[1], p[2]), 'rim'));
+               if (['cylinder','hex_prism','tri_prism'].includes(spec.type)) {
+                   [[r, h, 0], [-r, h, 0], [0, h, r], [0, h, -r]].forEach(p => addPoint(new THREE.Vector3(p[0], p[1], p[2]), 'rim'));
                }
           }
           
-          if (spec.type === 'sphere' || spec.type === 'hemisphere') {
-              // 6 Cardinal Points
-              addPoint(new THREE.Vector3(r, 0, 0), 'surface');
-              addPoint(new THREE.Vector3(-r, 0, 0), 'surface');
-              addPoint(new THREE.Vector3(0, r, 0), 'surface'); // Top
-              addPoint(new THREE.Vector3(0, -r, 0), 'surface'); // Bottom
-              addPoint(new THREE.Vector3(0, 0, r), 'surface');
-              addPoint(new THREE.Vector3(0, 0, -r), 'surface');
+          if (['sphere','hemisphere'].includes(spec.type)) {
+              [[r,0,0], [-r,0,0], [0,r,0], [0,-r,0], [0,0,r], [0,0,-r]].forEach(p => addPoint(new THREE.Vector3(p[0], p[1], p[2]), 'surface'));
           }
       }
   }
@@ -415,18 +390,24 @@ export class GeometryEngine {
       if (active) {
           this.showSnapMarkers();
       } else {
+          this.resetMeasurement();
           this.snapMarkersGroup.clear();
-          this.highlightMesh.visible = false;
-          this.measureStart = null;
-          this.measureLineGroup.clear();
-          this.previewLineGroup.clear();
-          this.onMeasureChange(null);
       }
+  }
+  
+  private resetMeasurement() {
+      this.measureState = 0;
+      this.measureStart = null;
+      this.activeSnapPoint = null;
+      this.highlightMesh.visible = false;
+      this.measureLineGroup.clear();
+      this.previewLineGroup.clear();
+      this.onMeasureChange(null);
   }
   
   private showSnapMarkers() {
       this.snapMarkersGroup.clear();
-      const dotGeo = new THREE.SphereGeometry(0.25); // Visible marker size
+      const dotGeo = new THREE.SphereGeometry(0.25);
       const dotMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, depthTest: false, transparent: true, opacity: 0.6 });
       
       this.snapPoints.forEach(pt => {
@@ -442,13 +423,13 @@ export class GeometryEngine {
 
   private onPointerMove = (e: MouseEvent) => {
       this.updateMouse(e.clientX, e.clientY);
-      this.checkSnapping();
+      this.handleHoverInteraction();
   }
   
   private onTouchMove = (e: TouchEvent) => {
       if (e.touches.length > 0) {
-          this.updateMouse(e.touches[0].clientX, e.touches[0].clientY - 50); // Touch offset
-          this.checkSnapping();
+          this.updateMouse(e.touches[0].clientX, e.touches[0].clientY - 50);
+          this.handleHoverInteraction();
       }
   }
 
@@ -458,203 +439,140 @@ export class GeometryEngine {
       this.mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
   }
 
-  private checkSnapping() {
+  private handleHoverInteraction() {
       if (!this.isMeasuring) return;
 
-      this.raycaster.setFromCamera(this.mouse, this.camera);
       this.activeSnapPoint = null;
       this.highlightMesh.visible = false;
+      this.renderer.domElement.style.cursor = 'default';
 
-      let closestDist = Infinity;
-      let closestPoint: THREE.Vector3 | null = null;
-      const SNAP_RADIUS = 1.5; 
+      // 1. Magnetic Screen-Space Snapping
+      // This allows selecting vertices "through" the shape and feels much better
+      let closestDistSq = Infinity;
+      let closestPt: THREE.Vector3 | null = null;
+      const SNAP_THRESHOLD_SQ = 0.02; // Roughly 10-15% of screen width squared
 
-      // 1. Raycast against shapes to find surface point
-      const intersects = this.raycaster.intersectObjects(this.shapes.children, true);
-      if (intersects.length > 0) {
-          closestPoint = intersects[0].point;
-          closestDist = 0; 
-      }
-
-      // 2. Check predefined snap points
-      for(const pt of this.snapPoints) {
-          if (closestPoint) {
-              const d = pt.position.distanceTo(closestPoint);
-              // Snap if close to a valid point
-              if (d < SNAP_RADIUS && d < closestDist + 1) { 
-                   this.activeSnapPoint = pt.position;
-                   break;
-              }
-          }
-      }
-      
-      // 3. Fallback: Snap to the nearest marker if mouse ray is close enough in 2D space?
-      // Actually, relying on the surface intersect + distance is usually good enough for 3D.
-      
-      // If we didn't find a snap point but hit the mesh, do we let them click anywhere?
-      // User requested "vertexes and centers", so we should strongly prefer Snapped Points.
-      // If no snap point found, we DO NOT highlight. This enforces measuring specific points.
-      
-      if (this.activeSnapPoint) {
-          this.highlightMesh.position.copy(this.activeSnapPoint);
-          this.highlightMesh.visible = true;
-          this.renderer.domElement.style.cursor = 'crosshair';
+      for (const pt of this.snapPoints) {
+          const tempV = pt.position.clone();
+          tempV.project(this.camera);
           
-          this.previewLineGroup.clear();
-          if (this.measureStart) {
-              const geo = new THREE.BufferGeometry().setFromPoints([this.measureStart, this.activeSnapPoint]);
-              const mat = new THREE.LineDashedMaterial({ color: 0xff1493, dashSize: 0.5, gapSize: 0.2, scale: 1, depthTest: false });
-              const line = new THREE.Line(geo, mat);
-              line.computeLineDistances();
-              this.previewLineGroup.add(line);
+          // Check if visible (approx)
+          if (tempV.z > 1 || tempV.z < -1) continue;
+          
+          const dx = tempV.x - this.mouse.x;
+          const dy = tempV.y - this.mouse.y;
+          const dSq = dx*dx + dy*dy;
+          
+          if (dSq < SNAP_THRESHOLD_SQ && dSq < closestDistSq) {
+              closestDistSq = dSq;
+              closestPt = pt.position;
           }
+      }
+
+      let targetPoint: THREE.Vector3 | null = null;
+
+      if (closestPt) {
+          this.activeSnapPoint = closestPt;
+          targetPoint = closestPt;
+          this.highlightMesh.position.copy(closestPt);
+          this.highlightMesh.visible = true;
+          this.renderer.domElement.style.cursor = 'pointer';
       } else {
-          this.renderer.domElement.style.cursor = 'default';
-          this.previewLineGroup.clear();
+           // Fallback: Raycast Surface for rubber banding visual
+           this.raycaster.setFromCamera(this.mouse, this.camera);
+           const surfaceIntersects = this.raycaster.intersectObjects(this.shapes.children, true);
+           if (surfaceIntersects.length > 0) {
+               targetPoint = surfaceIntersects[0].point;
+           }
+      }
+
+      // Update Preview Line (Rubber Band)
+      this.previewLineGroup.clear();
+      if (this.measureState === 1 && this.measureStart && targetPoint) {
+          const geo = new THREE.BufferGeometry().setFromPoints([this.measureStart, targetPoint]);
+          const mat = new THREE.LineBasicMaterial({ color: 0xff1493, depthTest: false, linewidth: 2 });
+          const line = new THREE.Line(geo, mat);
+          this.previewLineGroup.add(line);
       }
   }
 
   private onPointerDown = (e: MouseEvent) => {
-      if (!this.isMeasuring || !this.activeSnapPoint) return;
+      this.mouseDownPos.set(e.clientX, e.clientY);
+  }
+
+  private onPointerUp = (e: MouseEvent) => {
+      if (!this.isMeasuring) return;
+
+      // Relaxed drag detection (15px)
+      const dist = new THREE.Vector2(e.clientX, e.clientY).distanceTo(this.mouseDownPos);
+      if (dist > 15) return;
       
-      if (!this.measureStart) {
-          this.measureStart = this.activeSnapPoint.clone();
-          this.measureLineGroup.clear();
-          const startMarker = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false}));
-          startMarker.position.copy(this.measureStart);
-          this.measureLineGroup.add(startMarker);
+      // LOGIC FOR CLICK (Setting Points)
+      if (this.activeSnapPoint) {
+          if (this.measureState === 0 || this.measureState === 2) {
+              // START
+              this.measureLineGroup.clear();
+              this.measureStart = this.activeSnapPoint.clone();
+              this.measureState = 1;
+              
+              const startMarker = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false}));
+              startMarker.position.copy(this.measureStart);
+              this.measureLineGroup.add(startMarker);
+              
+              this.onMeasureChange(null);
+              
+          } else if (this.measureState === 1) {
+              // FINISH
+              const end = this.activeSnapPoint.clone();
+              const dist3d = this.measureStart!.distanceTo(end);
+              
+              this.previewLineGroup.clear();
+              
+              const path = new THREE.LineCurve3(this.measureStart!, end);
+              const tube = new THREE.TubeGeometry(path, 1, 0.15, 8, false);
+              const mesh = new THREE.Mesh(tube, new THREE.MeshBasicMaterial({ color: 0xff1493, depthTest: false }));
+              
+              const endMarker = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false}));
+              endMarker.position.copy(end);
+              
+              this.measureLineGroup.add(mesh, endMarker);
+              
+              const mid = this.measureStart!.clone().lerp(end, 0.5);
+              mid.y += 0.5;
+              this.createLabel({ 
+                  text: `${dist3d.toFixed(2)}`, 
+                  position: mid, 
+                  color: '#ff1493' 
+              });
+              
+              this.onMeasureChange(dist3d);
+              this.measureStart = null;
+              this.measureState = 2;
+          }
       } else {
-          const end = this.activeSnapPoint.clone();
-          const dist = this.measureStart.distanceTo(end);
-          
-          // Clear previous preview
-          this.previewLineGroup.clear();
-          this.measureLineGroup.clear(); // Only show one active measurement at a time as requested
-
-          // Draw Result Line
-          const path = new THREE.LineCurve3(this.measureStart, end);
-          const tube = new THREE.TubeGeometry(path, 1, 0.3, 8, false); // Thicker line (0.3 radius)
-          const mesh = new THREE.Mesh(tube, new THREE.MeshBasicMaterial({ color: 0xff1493, depthTest: false }));
-          
-          const startMarker = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false}));
-          startMarker.position.copy(this.measureStart);
-          
-          const endMarker = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false}));
-          endMarker.position.copy(end);
-
-          this.measureLineGroup.add(mesh, startMarker, endMarker);
-          
-          this.onMeasureChange(dist);
-          this.measureStart = null;
+          // If clicking empty space, reset only if finished, otherwise keep measuring (allows rotating cam mid-measure)
+          if (this.measureState === 2) {
+              this.resetMeasurement();
+              this.showSnapMarkers();
+          }
       }
   }
 
   // --- Visual Helpers ---
-  private createLabel(spec: LabelSpec) {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if(!ctx) return;
-      canvas.width = 256; canvas.height = 128;
+  private createLabel(spec: LabelSpec) { 
+      const c = document.createElement('canvas'); const ctx = c.getContext('2d'); if(!ctx) return; c.width=256;c.height=128; ctx.fillStyle=spec.color||'#ffffff'; ctx.font='bold 40px Arial'; ctx.textAlign='center'; const p = spec.text.split('_'); ctx.fillText(p[0], 128, 64); if(p[1]) { ctx.font='bold 28px Arial'; ctx.fillText(p[1], 128+ctx.measureText(p[0]).width/2+10, 84); } 
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false })); 
+      s.position.set(spec.position.x, spec.position.y, spec.position.z); 
+      s.scale.set(4, 2, 1); 
+      s.renderOrder = 999; 
       
-      ctx.fillStyle = spec.color || '#ffffff';
-      ctx.font = 'bold 40px Arial';
-      ctx.textAlign = 'center';
-      
-      // Basic subscript parsing (e.g., h_2)
-      const parts = spec.text.split('_');
-      ctx.fillText(parts[0], 128, 64);
-      if(parts[1]) {
-          ctx.font = 'bold 28px Arial';
-          ctx.fillText(parts[1], 128 + ctx.measureText(parts[0]).width/2 + 10, 84);
+      if (spec.color === '#ff1493') {
+          this.measureLineGroup.add(s);
+      } else {
+          this.labelsGroup.add(s); 
       }
-      
-      const tex = new THREE.CanvasTexture(canvas);
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-      sprite.position.set(spec.position.x, spec.position.y, spec.position.z);
-      sprite.scale.set(4, 2, 1);
-      this.labelsGroup.add(sprite);
   }
   
-  private createDimension(spec: DimensionSpec) {
-      const start = new THREE.Vector3(spec.start.x, spec.start.y, spec.start.z);
-      const end = new THREE.Vector3(spec.end.x, spec.end.y, spec.end.z);
-      const offset = new THREE.Vector3(spec.offset.x, spec.offset.y, spec.offset.z);
-      
-      // Points shifted by offset
-      const p1 = start.clone().add(offset);
-      const p2 = end.clone().add(offset);
-      
-      // Main Line
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false });
-      const line = new THREE.Line(lineGeo, lineMat);
-      
-      // Extension Lines (from object to dimension line)
-      const ext1Geo = new THREE.BufferGeometry().setFromPoints([start, p1]);
-      const ext1 = new THREE.Line(ext1Geo, new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent:true, opacity:0.5, depthTest:false }));
-      
-      const ext2Geo = new THREE.BufferGeometry().setFromPoints([end, p2]);
-      const ext2 = new THREE.Line(ext2Geo, new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent:true, opacity:0.5, depthTest:false }));
-
-      // Ticks
-      const tickSize = 0.2;
-      const tick1 = new THREE.Mesh(new THREE.BoxGeometry(tickSize, 0.5, tickSize), new THREE.MeshBasicMaterial({color:0xffffff, depthTest:false}));
-      tick1.position.copy(p1);
-      const tick2 = new THREE.Mesh(new THREE.BoxGeometry(tickSize, 0.5, tickSize), new THREE.MeshBasicMaterial({color:0xffffff, depthTest:false}));
-      tick2.position.copy(p2);
-      
-      this.dimensionsGroup.add(line, ext1, ext2, tick1, tick2);
-      
-      // Text Label
-      const mid = p1.clone().lerp(p2, 0.5);
-      // Push text slightly away from line
-      mid.add(offset.clone().normalize().multiplyScalar(0.5));
-      this.createLabel({ text: spec.text, position: {x:mid.x, y:mid.y, z:mid.z} });
-  }
-  
-  private createAngle(spec: AngleSpec) {
-      const origin = new THREE.Vector3(spec.origin.x, spec.origin.y, spec.origin.z);
-      const dirA = new THREE.Vector3(spec.vecA.x, spec.vecA.y, spec.vecA.z).normalize();
-      const dirB = new THREE.Vector3(spec.vecB.x, spec.vecB.y, spec.vecB.z).normalize();
-      
-      const len = 1.5; // Reduced radius for better fit
-      
-      // Check if vectors are too close (prevent rendering bug)
-      if (dirA.distanceTo(dirB) < 0.001) return;
-
-      // Ray Lines
-      const lineAGeo = new THREE.BufferGeometry().setFromPoints([origin, origin.clone().add(dirA.clone().multiplyScalar(len*1.5))]);
-      const lineBGeo = new THREE.BufferGeometry().setFromPoints([origin, origin.clone().add(dirB.clone().multiplyScalar(len*1.5))]);
-      const mat = new THREE.LineBasicMaterial({ color: 0xfacc15, depthTest: false }); 
-      
-      this.anglesGroup.add(new THREE.Line(lineAGeo, mat));
-      this.anglesGroup.add(new THREE.Line(lineBGeo, mat));
-      
-      // Filled Sector (Pie Slice)
-      const curve = new THREE.EllipseCurve(
-          0, 0,            // ax, aY
-          len, len,        // xRadius, yRadius
-          0, dirA.angleTo(dirB), // aStartAngle, aEndAngle
-          false,            // aClockwise
-          0                 // aRotation
-      );
-      
-      // We need to properly orient this 2D shape in 3D space
-      // For simplicity in this engine, we will just use lines and a closing dash
-      // Real 3D sectors are complex to align without specific planes.
-      // Let's stick to the Triangle Visual which works well for 3D trig.
-
-      const pA = origin.clone().add(dirA.clone().multiplyScalar(len));
-      const pB = origin.clone().add(dirB.clone().multiplyScalar(len));
-      
-      const closeGeo = new THREE.BufferGeometry().setFromPoints([pA, pB]);
-      const closeLine = new THREE.Line(closeGeo, new THREE.LineDashedMaterial({ color: 0xfacc15, dashSize:0.2, gapSize:0.1, depthTest:false }));
-      closeLine.computeLineDistances();
-      this.anglesGroup.add(closeLine);
-
-      // Label
-      const midAngle = dirA.clone().add(dirB).normalize().multiplyScalar(len * 1.2);
-      const pos = origin.clone().add(midAngle);
-      this.createLabel({ text: spec.text || 'θ', position: {x:pos.x, y:pos.y, z:pos.z}, color: '#facc15' });
-  }
+  private createDimension(spec: DimensionSpec) { const s = new THREE.Vector3(spec.start.x, spec.start.y, spec.start.z), e = new THREE.Vector3(spec.end.x, spec.end.y, spec.end.z), o = new THREE.Vector3(spec.offset.x, spec.offset.y, spec.offset.z); const p1 = s.clone().add(o), p2 = e.clone().add(o); this.dimensionsGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p1, p2]), new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false })), new THREE.Line(new THREE.BufferGeometry().setFromPoints([s, p1]), new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent:true, opacity:0.5, depthTest:false })), new THREE.Line(new THREE.BufferGeometry().setFromPoints([e, p2]), new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent:true, opacity:0.5, depthTest:false }))); const mid = p1.clone().lerp(p2, 0.5).add(o.clone().normalize().multiplyScalar(0.5)); this.createLabel({ text: spec.text, position: {x:mid.x, y:mid.y, z:mid.z} }); }
+  private createAngle(spec: AngleSpec) { const o = new THREE.Vector3(spec.origin.x, spec.origin.y, spec.origin.z), dA = new THREE.Vector3(spec.vecA.x, spec.vecA.y, spec.vecA.z).normalize(), dB = new THREE.Vector3(spec.vecB.x, spec.vecB.y, spec.vecB.z).normalize(), l = 1.5; if(dA.distanceTo(dB)<0.001)return; const m = new THREE.LineBasicMaterial({ color: 0xfacc15, depthTest: false }); this.anglesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([o, o.clone().add(dA.clone().multiplyScalar(l*1.5))]), m), new THREE.Line(new THREE.BufferGeometry().setFromPoints([o, o.clone().add(dB.clone().multiplyScalar(l*1.5))]), m)); const pA = o.clone().add(dA.clone().multiplyScalar(l)), pB = o.clone().add(dB.clone().multiplyScalar(l)); const cl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([pA, pB]), new THREE.LineDashedMaterial({ color: 0xfacc15, dashSize:0.2, gapSize:0.1, depthTest:false })); cl.computeLineDistances(); this.anglesGroup.add(cl); const pos = o.clone().add(dA.clone().add(dB).normalize().multiplyScalar(l * 1.2)); this.createLabel({ text: spec.text || 'θ', position: {x:pos.x, y:pos.y, z:pos.z}, color: '#facc15' }); }
 }
