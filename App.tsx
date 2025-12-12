@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,7 +8,7 @@
  * - Snowman Summer Mode
 */
 
-import React, { Component, ErrorInfo, useReducer, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { ErrorInfo, useReducer, useEffect, useRef, useState, ReactNode } from 'react';
 import { gameReducer, initialGameState, INITIAL_PLAYER_STATE } from './utils/gameReducer';
 import { GeometryEngine } from './services/VoxelEngine';
 import { UIOverlay } from './components/UIOverlay';
@@ -28,11 +27,9 @@ interface ErrorBoundaryState {
     hasError: boolean;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-    constructor(props: ErrorBoundaryProps) {
-        super(props);
-        this.state = { hasError: false };
-    }
+// Fix: Use React.Component to ensure props are correctly typed
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    public state: ErrorBoundaryState = { hasError: false };
 
     static getDerivedStateFromError() { return { hasError: true }; }
     componentDidCatch(error: Error, info: ErrorInfo) { console.error(error, info); }
@@ -77,6 +74,10 @@ const AppContent = () => {
     useEffect(() => {
         const init = async () => {
             await audio.load(AUDIO_MANIFEST);
+            // Attempt to play welcome music on load if possible
+            if (state.phase === 'welcome') {
+                audio.playBGM('bgm_workshop');
+            }
         };
         init();
         
@@ -105,23 +106,22 @@ const AppContent = () => {
         return () => { window.removeEventListener('resize', resize); engine.cleanup(); };
     }, []);
 
-    // Scene Loading & Music
+    // Scene Loading & Music Logic
     useEffect(() => {
         if (state.phase === 'playing' && state.currentProblem && engineRef.current) {
             engineRef.current.loadScene(state.currentProblem.shapes, state.currentProblem.labels||[], state.currentProblem.angles||[], state.currentProblem.dimensions||[]);
             
+            // Determine track
+            let track = 'bgm_workshop';
             if (state.currentProblem.isBoss) {
                 const theme = state.currentProblem.bossMusicTheme || 'bgm_boss';
-                const key = theme.startsWith('bgm_') ? theme : `bgm_${theme}`;
-                audio.playBGM(key as any);
-            } else {
-                // Summer Theme for Snowman
-                if (state.player.avatarId === 'snowman') {
-                    audio.playBGM('bgm_summer');
-                } else {
-                    audio.playBGM('bgm_workshop');
-                }
+                track = theme.startsWith('bgm_') ? theme : `bgm_${theme}`;
+            } else if (state.player.avatarId === 'snowman') {
+                track = 'bgm_summer';
             }
+
+            audio.playBGM(track as any);
+
         } else if (state.phase === 'gameover') {
             audio.playSFX('gameover_sfx');
             audio.playBGM('bgm_gameover');
@@ -140,9 +140,11 @@ const AppContent = () => {
 
     // Clock SFX & Panic Mode
     useEffect(() => {
+        // Only tick if time is running out (<=10) AND greater than 0
         if (state.phase === 'playing' && state.quiz.timerActive && state.quiz.timeLeft <= 10 && state.quiz.timeLeft > 0) {
-            const pitch = 1.0 + ((10 - state.quiz.timeLeft) * 0.02);
-            audio.playSFX('clock_tick', { rate: pitch });
+            // Lower pitch for standard ticking since we are using a click sound now
+            const pitch = 0.8 + ((10 - state.quiz.timeLeft) * 0.05);
+            audio.playSFX('clock_tick', { rate: pitch, volume: 0.5 });
         }
     }, [state.quiz.timeLeft, state.phase]);
 
@@ -170,11 +172,17 @@ const AppContent = () => {
     }, [state.player.lives]);
 
     const handleStartGame = (id: any) => {
-        // FORCE AUDIO RESUME ON INTERACTION
+        // FORCE AUDIO RESUME AND RESTART BGM
+        // This ensures if the browser blocked the initial autoplay, it wakes up now.
+        // We stop the current BGM explicitly so playBGM restarts it fresh.
         audio.resume();
+        audio.stopBGM(100); 
         audio.playSFX('ui_click');
         
-        dispatch({type: 'START_GAME', avatarId: id});
+        // Small delay to ensure audio context is ready before game logic
+        setTimeout(() => {
+             dispatch({type: 'START_GAME', avatarId: id});
+        }, 50);
     };
     
     // SNOWMAN FILTER

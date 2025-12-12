@@ -29,8 +29,10 @@ export const AUDIO_MANIFEST: AudioManifest = {
     'damage_take': { src: ['https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'], volume: 0.8 },
     // Metallic hit for damaging boss
     'damage_boss': { src: ['https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3'], volume: 0.8 },
-    // Clean Woodblock Tick (Short/Sharp) to avoid garbling
-    'clock_tick':  { src: ['https://assets.mixkit.co/active_storage/sfx/2658/2658-preview.mp3'], volume: 0.8 }, 
+    
+    // USE SHORT CLICK FOR CLOCK (Prevents overlap/looping issues)
+    // Reusing the short mechanical click (2568) but pitched down in code usually
+    'clock_tick':  { src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'], volume: 0.6 }, 
     
     // --- MUSIC (Kevin MacLeod / Retro RPG Style) ---
     // Use MP3s for maximum compatibility

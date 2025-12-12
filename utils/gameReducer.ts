@@ -8,7 +8,7 @@ import { ProblemGenerator } from './ibQuestions';
 
 // Initial States
 export const INITIAL_PLAYER_STATE: PlayerState = {
-    version: 7,
+    version: 8,
     isDeveloperMode: false,
     avatarId: 'elf',
     level: 1,
