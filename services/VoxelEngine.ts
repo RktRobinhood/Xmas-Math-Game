@@ -407,8 +407,8 @@ export class GeometryEngine {
   
   private showSnapMarkers() {
       this.snapMarkersGroup.clear();
-      const dotGeo = new THREE.SphereGeometry(0.25);
-      const dotMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, depthTest: false, transparent: true, opacity: 0.6 });
+      const dotGeo = new THREE.SphereGeometry(0.35); // Larger size
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, depthTest: false, transparent: true, opacity: 0.8 }); // Higher opacity
       
       this.snapPoints.forEach(pt => {
           const dot = new THREE.Mesh(dotGeo, dotMat);
@@ -446,39 +446,50 @@ export class GeometryEngine {
       this.highlightMesh.visible = false;
       this.renderer.domElement.style.cursor = 'default';
 
-      // 1. Magnetic Screen-Space Snapping
-      // This allows selecting vertices "through" the shape and feels much better
-      let closestDistSq = Infinity;
-      let closestPt: THREE.Vector3 | null = null;
-      const SNAP_THRESHOLD_SQ = 0.02; // Roughly 10-15% of screen width squared
+      // Magnetic Snapping with Priority
+      const SNAP_THRESHOLD_SQ = 0.012; // Tuned for better balance (~10% screen width range)
+      const candidates: { distSq: number; point: THREE.Vector3; priority: number }[] = [];
 
       for (const pt of this.snapPoints) {
           const tempV = pt.position.clone();
           tempV.project(this.camera);
           
-          // Check if visible (approx)
           if (tempV.z > 1 || tempV.z < -1) continue;
           
           const dx = tempV.x - this.mouse.x;
           const dy = tempV.y - this.mouse.y;
           const dSq = dx*dx + dy*dy;
           
-          if (dSq < SNAP_THRESHOLD_SQ && dSq < closestDistSq) {
-              closestDistSq = dSq;
-              closestPt = pt.position;
+          if (dSq < SNAP_THRESHOLD_SQ) {
+              // Priority System:
+              // 2: Structural Centers (Height/Width definers)
+              // 2: Vertices (Sharp corners)
+              // 1: Center (Volumetric center)
+              // 0: Rims/Surface points
+              let priority = 0;
+              if (['center_top', 'center_bottom', 'vertex'].includes(pt.type)) priority = 2;
+              else if (pt.type === 'center') priority = 1;
+              
+              candidates.push({ distSq: dSq, point: pt.position, priority });
           }
       }
 
       let targetPoint: THREE.Vector3 | null = null;
 
-      if (closestPt) {
-          this.activeSnapPoint = closestPt;
-          targetPoint = closestPt;
-          this.highlightMesh.position.copy(closestPt);
+      if (candidates.length > 0) {
+          // Sort: Higher priority first, then closer distance
+          candidates.sort((a, b) => {
+              if (b.priority !== a.priority) return b.priority - a.priority;
+              return a.distSq - b.distSq;
+          });
+          
+          this.activeSnapPoint = candidates[0].point;
+          targetPoint = this.activeSnapPoint;
+          this.highlightMesh.position.copy(targetPoint);
           this.highlightMesh.visible = true;
           this.renderer.domElement.style.cursor = 'pointer';
       } else {
-           // Fallback: Raycast Surface for rubber banding visual
+           // Fallback: Raycast Surface
            this.raycaster.setFromCamera(this.mouse, this.camera);
            const surfaceIntersects = this.raycaster.intersectObjects(this.shapes.children, true);
            if (surfaceIntersects.length > 0) {
@@ -486,7 +497,7 @@ export class GeometryEngine {
            }
       }
 
-      // Update Preview Line (Rubber Band)
+      // Update Preview Line
       this.previewLineGroup.clear();
       if (this.measureState === 1 && this.measureStart && targetPoint) {
           const geo = new THREE.BufferGeometry().setFromPoints([this.measureStart, targetPoint]);
@@ -503,7 +514,6 @@ export class GeometryEngine {
   private onPointerUp = (e: MouseEvent) => {
       if (!this.isMeasuring) return;
 
-      // Relaxed drag detection (15px)
       const dist = new THREE.Vector2(e.clientX, e.clientY).distanceTo(this.mouseDownPos);
       if (dist > 15) return;
       
@@ -550,7 +560,6 @@ export class GeometryEngine {
               this.measureState = 2;
           }
       } else {
-          // If clicking empty space, reset only if finished, otherwise keep measuring (allows rotating cam mid-measure)
           if (this.measureState === 2) {
               this.resetMeasurement();
               this.showSnapMarkers();
