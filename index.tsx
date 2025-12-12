@@ -165,7 +165,7 @@ export const FORMULAS = [
 // 3. AUDIO
 // ==========================================
 
-declare class Howl { constructor(o:any); play(id?:number):number; stop(id?:number):void; fade(f:number,t:number,d:number,id:number):void; volume(v:number,id?:number):number; rate(r:number,id?:number):void; stereo(p:number,id?:number):void; loop(l:boolean,id?:number):void; once(e:string,c:()=>void,id?:number):void; playing(id?:number):boolean; }
+declare class Howl { constructor(o:any); play(id?:number):number; stop(id?:number):void; fade(f:number,t:number,d:number,id:number):void; volume(v:number,id?:number):number; rate(r:number,id?:number):void; stereo(p:number,id?:number):void; loop(l:boolean,id?:number):void; once(e:string,c:()=>void,id?:number):void; playing(id?:number):boolean; unload():void; }
 declare const Howler: { volume(v:number):void; mute(m:boolean):void; ctx:AudioContext; autoUnlock:boolean; };
 
 export interface SoundConfig {
@@ -205,9 +205,9 @@ class AudioManager {
         if (this.currentMusicName && this.currentMusicId !== null) {
             const sound = this.sounds.get(this.currentMusicName);
             if (sound && !sound.playing(this.currentMusicId)) {
-                const vol = this.musicVol * this.masterVol;
+                // Try to recover lost music context
                 this.currentMusicId = sound.play();
-                sound.volume(vol, this.currentMusicId);
+                sound.volume(this.musicVol * this.masterVol, this.currentMusicId);
                 sound.loop(true, this.currentMusicId);
             }
         }
@@ -226,7 +226,7 @@ class AudioManager {
                     html5: config.html5 ?? false,
                     preload: true,
                     onload: () => resolve(),
-                    onloaderror: () => resolve()
+                    onloaderror: () => resolve() // Fail gracefully
                 });
                 this.sounds.set(key, sound);
             });
@@ -240,8 +240,64 @@ class AudioManager {
         }
     }
 
+    // Synthesizer fallback for when external MP3s fail (403/404)
+    private playSynthTone(type: 'correct' | 'wrong' | 'click' | 'snap') {
+        if (typeof Howler === 'undefined' || !Howler.ctx) return;
+        const ctx = Howler.ctx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        const now = ctx.currentTime;
+        
+        if (type === 'correct') {
+            // High Chime
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, now); // C5
+            osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+            gain.gain.setValueAtTime(0.3 * this.sfxVol, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        } else if (type === 'wrong') {
+            // Low Buzz
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+            gain.gain.setValueAtTime(0.3 * this.sfxVol, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        } else if (type === 'click') {
+            // Short blip
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, now);
+            gain.gain.setValueAtTime(0.1 * this.sfxVol, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            osc.start(now);
+            osc.stop(now + 0.05);
+        } else if (type === 'snap') {
+            // High tick
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(1200, now);
+            gain.gain.setValueAtTime(0.1 * this.sfxVol, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            osc.start(now);
+            osc.stop(now + 0.05);
+        }
+    }
+
     public playSFX(name: string, options?: { volume?: number, rate?: number, pan?: number, variance?: number }) {
-        if (this.isMuted || !this.isLoaded) return;
+        if (this.isMuted) return;
+        
+        // Use synth for critical gameplay feedback to ensure they always work
+        if (name === 'correct' || name === 'wrong' || name === 'ui_click' || name === 'snap') {
+            this.playSynthTone(name as any);
+            return;
+        }
+
+        if (!this.isLoaded) return;
         const sound = this.sounds.get(name);
         if (!sound) return;
 
@@ -263,16 +319,13 @@ class AudioManager {
             if (currentSound && this.currentMusicId !== null && currentSound.playing(this.currentMusicId)) return;
         }
 
+        // Strictly stop any previous music to prevent overlap
         if (this.currentMusicName && this.currentMusicName !== name) {
             const oldSound = this.sounds.get(this.currentMusicName);
             const oldId = this.currentMusicId;
             if (oldSound && oldId !== null) {
-                if (oldSound.playing(oldId)) {
-                    oldSound.fade(oldSound.volume(oldId), 0, fadeDuration, oldId);
-                    oldSound.once('fade', () => oldSound.stop(oldId), oldId);
-                } else {
-                    oldSound.stop(oldId);
-                }
+                // Immediate stop or fast fade to prevent bleed
+                oldSound.stop(oldId); 
             }
         }
 
@@ -314,19 +367,22 @@ class AudioManager {
 export const audio = new AudioManager();
 
 export const AUDIO_MANIFEST: AudioManifest = {
-    'ui_click':    { src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'], volume: 0.2 },
+    // UI - Synth fallback used for click
     'ui_open':     { src: ['https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'], volume: 0.3 },
     'ui_close':    { src: ['https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3'], volume: 0.3 },
     'buy':         { src: ['https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'], volume: 0.5 },
-    'snap':        { src: ['https://assets.mixkit.co/active_storage/sfx/2579/2579-preview.mp3'], volume: 0.2 },
-    'correct':     { src: ['https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'], volume: 0.5 },
+    
+    // Gameplay
     'level_up':    { src: ['https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3'], volume: 0.6 },
     'victory_boss': { src: ['https://assets.mixkit.co/active_storage/sfx/1434/1434-preview.mp3'], volume: 0.7 }, 
-    'wrong':       { src: ['https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'], volume: 0.5 },
+    
+    // Negative
     'gameover_sfx':{ src: ['https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'], volume: 0.8 },
     'damage_take': { src: ['https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'], volume: 1.0 },
     'damage_boss': { src: ['https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3'], volume: 0.8 },
     'clock_tick':  { src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'], volume: 0.6 }, 
+    
+    // Music (Stable URLs)
     'bgm_workshop': { src: ['https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dance%20of%20the%20Sugar%20Plum%20Fairy.mp3'], loop: true, html5: true, volume: 0.6 },
     'bgm_summer': { src: ['https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3'], loop: true, html5: true, volume: 0.6 },
     'bgm_nutcracker': { src: ['https://incompetech.com/music/royalty-free/mp3-royaltyfree/Crusade.mp3'], loop: true, html5: true, volume: 0.7 },
@@ -721,7 +777,14 @@ class GeometryEngine {
       if (!this.measureStart) { this.measureStart = this.activeSnapPoint.clone(); this.measureLineGroup.clear(); const m = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false})); m.position.copy(this.measureStart); this.measureLineGroup.add(m); } 
       else { const end = this.activeSnapPoint.clone(); const dist = this.measureStart.distanceTo(end); this.previewLineGroup.clear(); this.measureLineGroup.clear(); const tube = new THREE.TubeGeometry(new THREE.LineCurve3(this.measureStart, end), 1, 0.3, 8, false); const mesh = new THREE.Mesh(tube, new THREE.MeshBasicMaterial({ color: 0xff1493, depthTest: false })); const s = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false})); s.position.copy(this.measureStart); const e = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0xff1493, depthTest: false})); e.position.copy(end); this.measureLineGroup.add(mesh, s, e); this.onMeasureChange(dist); this.measureStart = null; }
   }
-  private createLabel(spec: LabelSpec) { const c = document.createElement('canvas'); const ctx = c.getContext('2d'); if(!ctx) return; c.width=256;c.height=128; ctx.fillStyle=spec.color||'#ffffff'; ctx.font='bold 40px Arial'; ctx.textAlign='center'; const p = spec.text.split('_'); ctx.fillText(p[0], 128, 64); if(p[1]) { ctx.font='bold 28px Arial'; ctx.fillText(p[1], 128+ctx.measureText(p[0]).width/2+10, 84); } const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false })); s.position.set(spec.position.x, spec.position.y, spec.position.z); s.scale.set(4, 2, 1); this.labelsGroup.add(s); }
+  private createLabel(spec: LabelSpec) { 
+      const c = document.createElement('canvas'); const ctx = c.getContext('2d'); if(!ctx) return; c.width=256;c.height=128; ctx.fillStyle=spec.color||'#ffffff'; ctx.font='bold 40px Arial'; ctx.textAlign='center'; const p = spec.text.split('_'); ctx.fillText(p[0], 128, 64); if(p[1]) { ctx.font='bold 28px Arial'; ctx.fillText(p[1], 128+ctx.measureText(p[0]).width/2+10, 84); } 
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false })); 
+      s.position.set(spec.position.x, spec.position.y, spec.position.z); 
+      s.scale.set(4, 2, 1); 
+      s.renderOrder = 999; // Ensure it draws on top of all transparent objects
+      this.labelsGroup.add(s); 
+  }
   private createDimension(spec: DimensionSpec) { const s = new THREE.Vector3(spec.start.x, spec.start.y, spec.start.z), e = new THREE.Vector3(spec.end.x, spec.end.y, spec.end.z), o = new THREE.Vector3(spec.offset.x, spec.offset.y, spec.offset.z); const p1 = s.clone().add(o), p2 = e.clone().add(o); this.dimensionsGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p1, p2]), new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false })), new THREE.Line(new THREE.BufferGeometry().setFromPoints([s, p1]), new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent:true, opacity:0.5, depthTest:false })), new THREE.Line(new THREE.BufferGeometry().setFromPoints([e, p2]), new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent:true, opacity:0.5, depthTest:false }))); const mid = p1.clone().lerp(p2, 0.5).add(o.clone().normalize().multiplyScalar(0.5)); this.createLabel({ text: spec.text, position: {x:mid.x, y:mid.y, z:mid.z} }); }
   private createAngle(spec: AngleSpec) { const o = new THREE.Vector3(spec.origin.x, spec.origin.y, spec.origin.z), dA = new THREE.Vector3(spec.vecA.x, spec.vecA.y, spec.vecA.z).normalize(), dB = new THREE.Vector3(spec.vecB.x, spec.vecB.y, spec.vecB.z).normalize(), l = 1.5; if(dA.distanceTo(dB)<0.001)return; const m = new THREE.LineBasicMaterial({ color: 0xfacc15, depthTest: false }); this.anglesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([o, o.clone().add(dA.clone().multiplyScalar(l*1.5))]), m), new THREE.Line(new THREE.BufferGeometry().setFromPoints([o, o.clone().add(dB.clone().multiplyScalar(l*1.5))]), m)); const pA = o.clone().add(dA.clone().multiplyScalar(l)), pB = o.clone().add(dB.clone().multiplyScalar(l)); const cl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([pA, pB]), new THREE.LineDashedMaterial({ color: 0xfacc15, dashSize:0.2, gapSize:0.1, depthTest:false })); cl.computeLineDistances(); this.anglesGroup.add(cl); const pos = o.clone().add(dA.clone().add(dB).normalize().multiplyScalar(l * 1.2)); this.createLabel({ text: spec.text || 'θ', position: {x:pos.x, y:pos.y, z:pos.z}, color: '#facc15' }); }
 }
@@ -935,14 +998,18 @@ const WelcomeScreen: React.FC<any> = ({ visible, lives, gold, highScore, onStart
 // 8. APP ROOT
 // ==========================================
 
-class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
-    constructor(props: {children: ReactNode}) {
+class ErrorBoundary extends Component<{children?: ReactNode}, {hasError: boolean}> {
+    constructor(props: {children?: ReactNode}) {
         super(props);
         this.state = { hasError: false };
     }
+    public state = { hasError: false };
     static getDerivedStateFromError() { return { hasError: true }; }
     componentDidCatch(error: Error, info: ErrorInfo) { console.error(error, info); }
-    render() { if (this.state.hasError) return <div className="p-4 bg-red-900 text-white">Critical Error: V1.1 Crash</div>; return this.props.children; }
+    render() { 
+        if (this.state.hasError) return <div className="p-4 bg-red-900 text-white">Critical Error: V1.1 Crash</div>; 
+        return this.props.children; 
+    }
 }
 
 const AppContent = () => {
@@ -959,10 +1026,56 @@ const AppContent = () => {
     const engineRef = useRef<GeometryEngine | null>(null);
 
     useEffect(() => { localStorage.setItem(SAVE_KEY, JSON.stringify(state.player)); }, [state.player]);
-    useEffect(() => { const init = async () => { await audio.load(AUDIO_MANIFEST); if (state.phase === 'welcome') audio.playBGM('bgm_workshop'); }; init(); const unlock = () => { audio.resume(); window.removeEventListener('click', unlock); }; window.addEventListener('click', unlock); return () => window.removeEventListener('click', unlock); }, []);
+    
+    // Fix: Clean up listener properly
+    useEffect(() => { 
+        const init = async () => { 
+            await audio.load(AUDIO_MANIFEST); 
+            // Fix: Check phase before playing to avoid unwanted overlap on reload
+            if (state.phase === 'welcome') {
+                audio.playBGM('bgm_workshop');
+            }
+        }; 
+        init(); 
+        
+        const unlock = () => { 
+            audio.resume(); 
+            // Only remove if context is actually running
+            if (typeof Howler !== 'undefined' && Howler.ctx && Howler.ctx.state === 'running') {
+               window.removeEventListener('click', unlock); 
+            }
+        }; 
+        window.addEventListener('click', unlock); 
+        return () => window.removeEventListener('click', unlock); 
+    }, []);
+
     useEffect(() => { const s = state.player.settings; audio.setVolumes(s.masterVolume, s.bgmVolume, s.sfxVolume); }, [state.player.settings]);
     useEffect(() => { if (!containerRef.current) return; const engine = new GeometryEngine(containerRef.current, (dist) => { setMeasuredDistance(dist); if (dist !== null) audio.playSFX('snap'); }); engineRef.current = engine; const resize = () => engine.handleResize(); window.addEventListener('resize', resize); return () => { window.removeEventListener('resize', resize); engine.cleanup(); }; }, []);
-    useEffect(() => { if (state.phase === 'playing' && state.currentProblem && engineRef.current) { engineRef.current.loadScene(state.currentProblem.shapes, state.currentProblem.labels||[], state.currentProblem.angles||[], state.currentProblem.dimensions||[]); let track = 'bgm_workshop'; if (state.currentProblem.isBoss) { const theme = state.currentProblem.bossMusicTheme || 'bgm_boss'; track = theme.startsWith('bgm_') ? theme : `bgm_${theme}`; } else if (state.player.avatarId === 'snowman') { track = 'bgm_summer'; } audio.playBGM(track as any); } else if (state.phase === 'gameover') { audio.playSFX('gameover_sfx'); audio.playBGM('bgm_gameover'); } else if (state.phase === 'welcome') { audio.playBGM('bgm_workshop'); } }, [state.currentProblem, state.phase]);
+    
+    // Main Game Loop for Scene & Audio Logic
+    useEffect(() => { 
+        if (state.phase === 'playing' && state.currentProblem && engineRef.current) { 
+            engineRef.current.loadScene(state.currentProblem.shapes, state.currentProblem.labels||[], state.currentProblem.angles||[], state.currentProblem.dimensions||[]); 
+            
+            // Logic to determine track
+            let track = 'bgm_workshop'; 
+            if (state.currentProblem.isBoss) { 
+                const theme = state.currentProblem.bossMusicTheme || 'bgm_boss'; 
+                track = theme.startsWith('bgm_') ? theme : `bgm_${theme}`; 
+            } else if (state.player.avatarId === 'snowman') { 
+                track = 'bgm_summer'; 
+            } 
+            
+            // Fix: audio.playBGM now handles stopping previous tracks internally
+            audio.playBGM(track as any); 
+        } else if (state.phase === 'gameover') { 
+            audio.playSFX('gameover_sfx'); 
+            audio.playBGM('bgm_gameover'); 
+        } else if (state.phase === 'welcome') { 
+            audio.playBGM('bgm_workshop'); 
+        } 
+    }, [state.currentProblem, state.phase]);
+
     useEffect(() => { const timer = setInterval(() => { if (state.phase === 'playing' && state.quiz.timerActive) dispatch({type: 'TICK_TIMER'}); }, 1000); return () => clearInterval(timer); }, [state.phase, state.quiz.timerActive]);
     useEffect(() => { if (state.phase === 'playing' && state.quiz.timerActive && state.quiz.timeLeft <= 10 && state.quiz.timeLeft > 0) { const pitch = 0.8 + ((10 - state.quiz.timeLeft) * 0.05); audio.playSFX('clock_tick', { rate: pitch, volume: 0.5 }); } }, [state.quiz.timeLeft, state.phase]);
     useEffect(() => { if (state.quiz.feedback === 'correct') { const isBossKill = state.phase === 'intermission' && state.currentProblem?.isBoss; audio.playSFX(isBossKill ? 'victory_boss' : 'correct'); } if (state.quiz.feedback === 'incorrect') audio.playSFX('wrong'); if (state.quiz.feedback === 'stage_complete') { audio.playSFX('damage_boss'); setTimeout(() => dispatch({type: 'RESET_FEEDBACK'}), 1500); } if (state.quiz.feedback === 'level_complete' && !state.currentProblem?.isBoss) { audio.playSFX('level_up'); } }, [state.quiz.feedback]);

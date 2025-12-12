@@ -27,11 +27,11 @@ interface ErrorBoundaryState {
     hasError: boolean;
 }
 
-// Fix: Use React.Component to ensure props are correctly typed
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    public state: ErrorBoundaryState = { hasError: false };
+    
     constructor(props: ErrorBoundaryProps) {
         super(props);
-        this.state = { hasError: false };
     }
 
     static getDerivedStateFromError() { return { hasError: true }; }
