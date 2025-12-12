@@ -23,10 +23,10 @@ export const AUDIO_MANIFEST: AudioManifest = {
     // Gameplay - NEGATIVE / STRESS
     // SHORTER, Less Aggressive Error Blip
     'wrong':       { src: ['https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'], volume: 0.5 },
-    // Dedicated Game Over Jingle
+    // Game Over: Dramatic Retro Failure
     'gameover_sfx':{ src: ['https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'], volume: 0.8 },
-    // Heavy impact/crunch for taking damage
-    'damage_take': { src: ['https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'], volume: 0.8 },
+    // Damage: Heavy retro thud/grunt
+    'damage_take': { src: ['https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'], volume: 1.0 },
     // Metallic hit for damaging boss
     'damage_boss': { src: ['https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3'], volume: 0.8 },
     

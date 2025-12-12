@@ -17,6 +17,7 @@ declare class Howl {
     state(): string;
     duration(): number;
     playing(id?: number): boolean;
+    unload(): void;
 }
 
 declare const Howler: {
@@ -97,6 +98,9 @@ class AudioManager {
      * Preloads all sounds defined in the manifest.
      */
     public async load(manifest: AudioManifest): Promise<void> {
+        // Prevent double loading (React StrictMode fix)
+        if (this.isLoaded) return;
+
         if (typeof Howl === 'undefined') {
             console.warn("Howler.js not loaded. Audio disabled.");
             return;
@@ -191,11 +195,16 @@ class AudioManager {
         if (this.currentMusicName && this.currentMusicName !== name) {
             const oldSound = this.sounds.get(this.currentMusicName);
             const oldId = this.currentMusicId;
-            if (oldSound && oldId !== null && oldSound.playing(oldId)) {
-                oldSound.fade(oldSound.volume(oldId), 0, fadeDuration, oldId);
-                oldSound.once('fade', () => {
+            if (oldSound && oldId !== null) {
+                // If it's playing, fade out. If not, just stop it to be safe.
+                if (oldSound.playing(oldId)) {
+                    oldSound.fade(oldSound.volume(oldId), 0, fadeDuration, oldId);
+                    oldSound.once('fade', () => {
+                        oldSound.stop(oldId);
+                    }, oldId);
+                } else {
                     oldSound.stop(oldId);
-                }, oldId);
+                }
             }
         }
 

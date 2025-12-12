@@ -78,7 +78,9 @@ const ConeSlant = (diff: number): Problem => {
         id: createId(), title: "Cone Slant Height", difficulty: diff, goldReward: 20,
         shapes: [{ id: '1', type: 'cone', position: {x:0,y:h/2,z:0}, rotation:{x:0,y:0,z:0}, dims:{radius:r, height:h}, color: COLORS.presents[2] }],
         dimensions: [
-            { start: {x:0, y:0, z:r}, end: {x:0, y:h, z:r}, offset: {x:2,y:0,z:0}, text: `h=${h}` },
+            // Vertical Height (h): From Center Bottom to Center Top, offset to outside
+            { start: {x:0, y:0, z:0}, end: {x:0, y:h, z:0}, offset: {x:r + 2, y:0, z:0}, text: `h=${h}` },
+            // Radius (r)
             { start: {x:0, y:0, z:0}, end: {x:r, y:0, z:0}, offset: {x:0,y:-1,z:0}, text: `r=${r}` }
         ],
         stages: [{ id: '1', question: "Find the slant height (l).", answer: l, unit: 'u', hint: 'Pythagoras: l² = h² + r²' }]

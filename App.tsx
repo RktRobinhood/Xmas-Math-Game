@@ -8,7 +8,7 @@
  * - Snowman Summer Mode
 */
 
-import React, { ErrorInfo, useReducer, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { Component, ErrorInfo, useReducer, useEffect, useRef, useState, ReactNode } from 'react';
 import { gameReducer, initialGameState, INITIAL_PLAYER_STATE } from './utils/gameReducer';
 import { GeometryEngine } from './services/VoxelEngine';
 import { UIOverlay } from './components/UIOverlay';
@@ -28,7 +28,7 @@ interface ErrorBoundaryState {
 }
 
 // Fix: Use React.Component to ensure props are correctly typed
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     public state: ErrorBoundaryState = { hasError: false };
 
     static getDerivedStateFromError() { return { hasError: true }; }
